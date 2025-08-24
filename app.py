@@ -92,35 +92,37 @@ def health():
     })
 
 @app.route("/api/chat", methods=["POST"])
+@app.route("/api/chat", methods=["POST"])
 def chat():
     try:
-        # Initialize RAG chain on first use (lazy loading)
         chain = initialize_rag_chain()
         
         if chain is None:
+            print("⚠️ RAG chain is None (failed to initialize)")
             return jsonify({
                 "error": "Service is initializing or missing configuration. Please try again in a moment."
             }), 503
         
         data = request.get_json()
+        print(f"📩 Raw request: {data}")
+        
         if not data:
             return jsonify({"error": "No data provided"}), 400
             
         msg = data.get("message", "")
-        
         if not msg.strip():
             return jsonify({"error": "Message cannot be empty"}), 400
         
         print(f"📥 User input: {msg}")
         
         response = chain.invoke({"input": msg})
-        print(f"📤 Response: {response['answer']}")
+        print(f"📤 Response: {response}")
         
-        return jsonify({"response": response["answer"]})
+        return jsonify({"response": response.get("answer", "⚠️ No answer key in response")})
         
     except Exception as e:
         print(f"❌ Chat error: {str(e)}")
-        return jsonify({"error": "An error occurred processing your request"}), 500
+        return jsonify({"error": str(e)}), 500
 
 @app.route("/api/clear", methods=["POST"])
 def clear():
