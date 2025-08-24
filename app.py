@@ -31,49 +31,53 @@ if groq_api_key:
 rag_chain = None
 
 def initialize_rag_chain():
-    """Lazy initialization of RAG chain to reduce cold start time"""
+    """Lazy initialization of RAG chain with lightweight embeddings"""
     global rag_chain
     
     if rag_chain is not None:
         return rag_chain
-    
+
+    print(f"🔑 Pinecone key loaded: {bool(pinecone_api_key)}")
+    print(f"🔑 Groq key loaded: {bool(groq_api_key)}")
+
     if not (pinecone_api_key and groq_api_key):
         print("❌ Missing API keys for initialization")
         return None
-    
+
     try:
-        print("🔄 Initializing RAG chain...")
-        
-        # Import only when needed to reduce startup time
-        from src.helper import download_hugging_face_embeddings
+        print("🔄 Initializing RAG chain with MiniLM embeddings...")
+
+        from langchain_community.embeddings import HuggingFaceEmbeddings
         from langchain_pinecone import PineconeVectorStore
         from langchain_groq import ChatGroq
         from langchain.chains import create_retrieval_chain
         from langchain.chains.combine_documents import create_stuff_documents_chain
         from langchain_core.prompts import ChatPromptTemplate
-        
-        embeddings = download_hugging_face_embeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
+
+        embeddings = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
+
         index_name = "medicalbot"
-        
+        print(f"📡 Connecting to Pinecone index: {index_name}")
+
         docsearch = PineconeVectorStore.from_existing_index(
             index_name=index_name,
             embedding=embeddings
         )
-        
+
         retriever = docsearch.as_retriever(search_type="similarity", search_kwargs={"k": 3})
         chatModel = ChatGroq(model="llama-3.3-70b-versatile")
-        
+
         prompt = ChatPromptTemplate.from_messages([
             ("system", system_prompt),
             ("human", "{input}"),
         ])
-        
+
         question_answer_chain = create_stuff_documents_chain(chatModel, prompt)
         rag_chain = create_retrieval_chain(retriever, question_answer_chain)
-        
+
         print("✅ RAG chain initialized successfully")
         return rag_chain
-        
+
     except Exception as e:
         print(f"❌ Error initializing RAG chain: {str(e)}")
         return None
@@ -92,37 +96,35 @@ def health():
     })
 
 @app.route("/api/chat", methods=["POST"])
-@app.route("/api/chat", methods=["POST"])
 def chat():
     try:
+        # Initialize RAG chain on first use (lazy loading)
         chain = initialize_rag_chain()
         
         if chain is None:
-            print("⚠️ RAG chain is None (failed to initialize)")
             return jsonify({
                 "error": "Service is initializing or missing configuration. Please try again in a moment."
             }), 503
         
         data = request.get_json()
-        print(f"📩 Raw request: {data}")
-        
         if not data:
             return jsonify({"error": "No data provided"}), 400
             
         msg = data.get("message", "")
+        
         if not msg.strip():
             return jsonify({"error": "Message cannot be empty"}), 400
         
         print(f"📥 User input: {msg}")
         
         response = chain.invoke({"input": msg})
-        print(f"📤 Response: {response}")
+        print(f"📤 Response: {response['answer']}")
         
-        return jsonify({"response": response.get("answer", "⚠️ No answer key in response")})
+        return jsonify({"response": response["answer"]})
         
     except Exception as e:
         print(f"❌ Chat error: {str(e)}")
-        return jsonify({"error": str(e)}), 500
+        return jsonify({"error": "An error occurred processing your request"}), 500
 
 @app.route("/api/clear", methods=["POST"])
 def clear():
