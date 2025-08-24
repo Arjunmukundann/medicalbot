@@ -52,7 +52,7 @@ def initialize_rag_chain():
         from langchain.chains.combine_documents import create_stuff_documents_chain
         from langchain_core.prompts import ChatPromptTemplate
         
-        embeddings = download_hugging_face_embeddings()
+        embeddings = download_hugging_face_embeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
         index_name = "medicalbot"
         
         docsearch = PineconeVectorStore.from_existing_index(
