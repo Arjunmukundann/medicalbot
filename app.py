@@ -35,6 +35,7 @@ def initialize_rag_chain():
     global rag_chain
     
     if rag_chain is not None:
+        print("✅ RAG chain already initialized")
         return rag_chain
 
     print(f"🔑 Pinecone key loaded: {bool(pinecone_api_key)}")
@@ -45,16 +46,27 @@ def initialize_rag_chain():
         return None
 
     try:
-        print("🔄 Initializing RAG chain with MiniLM embeddings...")
+        print("🔄 Starting RAG chain initialization...")
+        
+        # Import with better error handling
+        try:
+            from langchain_huggingface import HuggingFaceEmbeddings
+            print("✅ Using new HuggingFaceEmbeddings")
+        except ImportError:
+            from langchain_community.embeddings import HuggingFaceEmbeddings
+            print("⚠️ Using deprecated HuggingFaceEmbeddings")
+            
+        print("🔄 Loading embeddings model...")
+        embeddings = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
+        print("✅ Embeddings loaded")
 
-        from langchain_community.embeddings import HuggingFaceEmbeddings
+        print("🔄 Importing other dependencies...")
         from langchain_pinecone import PineconeVectorStore
         from langchain_groq import ChatGroq
         from langchain.chains import create_retrieval_chain
         from langchain.chains.combine_documents import create_stuff_documents_chain
         from langchain_core.prompts import ChatPromptTemplate
-
-        embeddings = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
+        print("✅ Dependencies imported")
 
         index_name = "medicalbot"
         print(f"📡 Connecting to Pinecone index: {index_name}")
@@ -63,25 +75,32 @@ def initialize_rag_chain():
             index_name=index_name,
             embedding=embeddings
         )
+        print("✅ Pinecone connection established")
 
         retriever = docsearch.as_retriever(search_type="similarity", search_kwargs={"k": 3})
+        print("✅ Retriever created")
+        
         chatModel = ChatGroq(model="llama-3.3-70b-versatile")
+        print("✅ ChatGroq model initialized")
 
         prompt = ChatPromptTemplate.from_messages([
             ("system", system_prompt),
             ("human", "{input}"),
         ])
+        print("✅ Prompt template created")
 
         question_answer_chain = create_stuff_documents_chain(chatModel, prompt)
+        print("✅ Question-answer chain created")
+        
         rag_chain = create_retrieval_chain(retriever, question_answer_chain)
-
         print("✅ RAG chain initialized successfully")
         return rag_chain
 
     except Exception as e:
-        print(f"❌ Error initializing RAG chain: {str(e)}")
+        print(f"❌ Error initializing RAG chain: {type(e).__name__}: {str(e)}")
+        import traceback
+        traceback.print_exc()
         return None
-
 # Routes
 @app.route("/")
 def index():
