@@ -586,41 +586,63 @@
         chatInput.focus();
 
         async function sendMessage() {
-            const message = chatInput.value.trim();
-            if (!message || sendButton.disabled) return;
+    const message = chatInput.value.trim();
+    if (!message || sendButton.disabled) return;
 
-            setInputState(false);
-            addMessage(message, 'user');
-            chatInput.value = '';
-            chatInput.style.height = 'auto';
-            showTypingIndicator();
+    console.log('🔥 FRONTEND: Sending message:', message);
+    
+    setInputState(false);
+    addMessage(message, 'user');
+    chatInput.value = '';
+    chatInput.style.height = 'auto';
+    showTypingIndicator();
 
-            try {
-                const response = await fetch(CHAT_ENDPOINT, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ message: message, timestamp: new Date().toISOString() })
-                });
+    try {
+        console.log('🔥 FRONTEND: Making fetch request to:', CHAT_ENDPOINT);
+        
+        const requestData = { 
+            message: message, 
+            timestamp: new Date().toISOString() 
+        };
+        console.log('🔥 FRONTEND: Request data:', requestData);
 
-                if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-                const data = await response.json();
+        const response = await fetch(CHAT_ENDPOINT, {
+            method: 'POST',
+            headers: { 
+                'Content-Type': 'application/json',
+                'Accept': 'application/json'
+            },
+            body: JSON.stringify(requestData)
+        });
 
-                hideTypingIndicator();
-                if (data.response) {
-                    addMessage(data.response, 'bot');
-                } else {
-                    throw new Error('Invalid response format');
-                }
+        console.log('🔥 FRONTEND: Response status:', response.status);
+        console.log('🔥 FRONTEND: Response headers:', response.headers);
 
-            } catch (error) {
-                hideTypingIndicator();
-                console.error('Error:', error);
-                addMessage("I'm having trouble connecting right now. Please check your connection and try again. If the problem continues, please refresh the page.", 'bot', true);
-            }
+        if (!response.ok) {
+            const errorText = await response.text();
+            console.error('🔥 FRONTEND: Error response:', errorText);
+            throw new Error(`HTTP error! status: ${response.status}, body: ${errorText}`);
+        }
+        
+        const data = await response.json();
+        console.log('🔥 FRONTEND: Response data:', data);
 
-            setInputState(true);
+        hideTypingIndicator();
+        if (data.response) {
+            addMessage(data.response, 'bot');
+        } else {
+            throw new Error('Invalid response format: ' + JSON.stringify(data));
         }
 
+    } catch (error) {
+        hideTypingIndicator();
+        console.error('🔥 FRONTEND: Fetch error:', error);
+        console.error('🔥 FRONTEND: Error stack:', error.stack);
+        addMessage(`Error: ${error.message}. Please check the console for more details.`, 'bot', true);
+    }
+
+    setInputState(true);
+}
         function addMessage(content, sender, isError = false) {
             const welcomeMessage = document.querySelector('.welcome-message');
             if (welcomeMessage) welcomeMessage.remove();
