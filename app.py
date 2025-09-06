@@ -153,7 +153,16 @@ def clear():
 def handler(event, context):
     """AWS Lambda/Vercel handler"""
     return app
-
+@app.route("/api/test", methods=["POST"])
+def test():
+    print("🔥 TEST ENDPOINT HIT")
+    try:
+        data = request.get_json()
+        print(f"🔍 Test data: {data}")
+        return jsonify({"status": "success", "message": "Test endpoint working"})
+    except Exception as e:
+        print(f"❌ Test endpoint error: {e}")
+        return jsonify({"error": str(e)}), 500
 # For local development
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
